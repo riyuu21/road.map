@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,12 +15,15 @@ const COPY: Record<Mode, { title: string; cta: string; switchLabel: string }> = 
 };
 
 export function AuthDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, continueWithGoogle } = useAuth();
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Portal needs the DOM; wait for mount so we don't render during SSR.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     if (!open) return;
@@ -28,7 +32,7 @@ export function AuthDialog({ open, onClose }: { open: boolean; onClose: () => vo
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,9 +53,9 @@ export function AuthDialog({ open, onClose }: { open: boolean; onClose: () => vo
     setError(null);
   };
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-background/70 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
@@ -78,7 +82,33 @@ export function AuthDialog({ open, onClose }: { open: boolean; onClose: () => vo
           </button>
         </div>
 
-        <form onSubmit={submit} className="mt-5 space-y-3">
+        <div className="mt-5 space-y-3">
+          <Button
+            type="button"
+            variant="secondary"
+            className="w-full"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              setError(null);
+              try {
+                await continueWithGoogle();
+              } catch (err) {
+                setError(err instanceof Error ? err.message : "Google login failed.");
+                setBusy(false);
+              }
+            }}
+          >
+            Continue with Google
+          </Button>
+          <div className="flex items-center gap-3 text-[10px] uppercase tracking-[0.2em] text-faint">
+            <span className="h-px flex-1 bg-line" />
+            or
+            <span className="h-px flex-1 bg-line" />
+          </div>
+        </div>
+
+        <form onSubmit={submit} className="mt-4 space-y-3">
           <div>
             <label htmlFor="auth-email" className="text-xs font-medium text-muted">
               Email
@@ -130,6 +160,7 @@ export function AuthDialog({ open, onClose }: { open: boolean; onClose: () => vo
           {COPY[mode].switchLabel}
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

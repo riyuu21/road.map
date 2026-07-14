@@ -28,8 +28,8 @@ interface RecentItem {
 
 export function RoadmapWorkspace() {
   const searchParams = useSearchParams();
-  const { user } = useAuth();
-  const { roadmap, status, error, generate } = useRoadmap();
+  const { user, token } = useAuth();
+  const { roadmap, status, error, errorCode, generate } = useRoadmap(token);
   const { progressByNode, overall, isChecked, toggleSubtopic, toggleNode, reset } =
     useProgress(roadmap);
   const [topic, setTopic] = useState(searchParams.get("topic") ?? "");
@@ -46,11 +46,11 @@ export function RoadmapWorkspace() {
 
   useEffect(() => {
     if (status !== "idle" && status !== "success") return;
-    fetch("/api/roadmaps")
+    fetch("/api/roadmaps", token ? { headers: { Authorization: `Bearer ${token}` } } : undefined)
       .then((r) => (r.ok ? r.json() : []))
       .then((items: RecentItem[]) => setRecent(items))
       .catch(() => {});
-  }, [status]);
+  }, [status, token]);
 
   const submit = (t: string) => {
     const trimmed = t.trim();
@@ -226,6 +226,19 @@ export function RoadmapWorkspace() {
                 <AlertCircle size={20} className="mx-auto text-danger" aria-hidden />
                 <p className="mt-3 text-sm font-medium">Couldn&apos;t generate the roadmap</p>
                 <p className="mt-1 text-xs text-muted">{error}</p>
+                {errorCode === "SIGNUP_REQUIRED" && (
+                  <p className="mt-3 rounded-lg border border-primary/30 bg-primary/10 p-3 text-xs text-muted">
+                    Sign up to generate your own roadmap and save progress.
+                  </p>
+                )}
+                {errorCode === "PROVIDER_KEYS_REQUIRED" && (
+                  <a
+                    href="/onboarding/api-keys"
+                    className="mt-3 block rounded-lg border border-primary/30 bg-primary/10 p-3 text-xs text-muted transition-colors hover:text-white"
+                  >
+                    Add an API key to generate custom roadmaps. You can still browse demo roadmaps.
+                  </a>
+                )}
                 <Button variant="secondary" size="sm" className="mt-4" onClick={() => submit(topic)}>
                   Try again
                 </Button>

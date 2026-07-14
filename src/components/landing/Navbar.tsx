@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Logo } from "./Logo";
+import { AccountMenu } from "@/components/auth/AccountMenu";
 
 const LINKS = [
   { href: "#how-it-works", label: "How it works" },
@@ -28,13 +29,16 @@ export function Navbar() {
             </a>
           ))}
         </div>
-        <Link
-          href="/roadmap"
-          className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-brand-gradient px-4 text-sm font-medium text-white shadow-glow transition-all hover:brightness-110"
-        >
-          Open Generator
-          <ArrowRight size={14} aria-hidden />
-        </Link>
+        <div className="flex items-center gap-3">
+          <AccountMenu />
+          <Link
+            href="/roadmap"
+            className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-brand-gradient px-4 text-sm font-medium text-white shadow-glow transition-all hover:brightness-110"
+          >
+            Open Generator
+            <ArrowRight size={14} aria-hidden />
+          </Link>
+        </div>
       </nav>
     </header>
   );

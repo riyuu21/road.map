@@ -89,7 +89,7 @@ export function RoadmapCanvas({
         source: edge.source,
         target: edge.target,
         type: "smoothstep",
-        animated: true,
+        animated: !demo,
         hidden: !visible.has(edge.source) || !visible.has(edge.target),
         style: EDGE_STYLE,
         markerEnd: EDGE_MARKER,

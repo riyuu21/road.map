@@ -77,20 +77,54 @@ def is_ai_configured() -> bool:
     return bool(configured_providers())
 
 
-async def generate_with_ai(client: httpx.AsyncClient, raw_topic: str) -> Roadmap:
+async def generate_with_ai(
+    client: httpx.AsyncClient, raw_topic: str, providers: list[Provider] | None = None
+) -> Roadmap:
     topic = display_topic(raw_topic)
     failures: list[str] = []
 
-    for provider in configured_providers():
+    for provider in (providers if providers is not None else configured_providers()):
         try:
             roadmap = await _call_provider(client, provider, topic)
             roadmap.provider = provider.id
             return roadmap
         except Exception as e:
-            failures.append(f"{provider.id}: {e}")
-            log.warning("provider %s failed — %s", provider.id, e)
+            failures.append(f"{provider.id}: {_safe_error(e)}")
+            log.warning("provider %s failed — %s", provider.id, _safe_error(e))
 
     raise RuntimeError(f"All AI providers failed — {' | '.join(failures)}")
+
+
+async def validate_provider(client: httpx.AsyncClient, provider: Provider) -> tuple[bool, str]:
+    """Validate an OpenAI-compatible provider without exposing secrets."""
+    try:
+        res = await client.get(
+            f"{provider.base_url}/models",
+            headers={"Authorization": f"Bearer {provider.api_key}"},
+            timeout=12.0,
+        )
+        if res.status_code == 200:
+            return True, "Validated."
+        if res.status_code in {401, 403}:
+            return False, f"{provider.id} rejected the API key."
+        # Some compatible endpoints do not implement /models; try tiny chat request.
+        if res.status_code in {404, 405}:
+            body = {"model": provider.model, "messages": [{"role": "user", "content": "Reply with OK"}], "max_tokens": 3}
+            chat = await _post(client, provider, body)
+            if chat.status_code == 200:
+                return True, "Validated."
+            return False, f"{provider.id} validation failed with HTTP {chat.status_code}."
+        return False, f"{provider.id} validation failed with HTTP {res.status_code}."
+    except Exception as e:
+        return False, f"{provider.id} validation failed: {_safe_error(e)}"
+
+
+def _safe_error(error: Exception) -> str:
+    text = str(error)
+    # Avoid reflecting bearer tokens or long key-like strings from provider error bodies.
+    text = re.sub(r"Bearer\s+[A-Za-z0-9._\-]+", "Bearer [redacted]", text)
+    text = re.sub(r"(gsk_|sk-|AIza)[A-Za-z0-9._\-]+", r"\1[redacted]", text)
+    return text[:220]
 
 
 async def _call_provider(client: httpx.AsyncClient, provider: Provider, topic: str) -> Roadmap:

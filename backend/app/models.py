@@ -1,9 +1,10 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 SkillLevel = Literal["beginner", "intermediate", "advanced"]
+ProviderId = Literal["groq", "gemini", "openrouter", "mistral", "custom"]
 
 
 class RoadmapNode(BaseModel):
@@ -38,8 +39,25 @@ class StoredRoadmap(Roadmap):
 class StoredUser(BaseModel):
     id: str
     email: str
-    passwordHash: str
+    passwordHash: str = ""
+    googleSub: str | None = None
     createdAt: datetime
+
+
+class ProviderSetting(BaseModel):
+    id: ProviderId
+    enabled: bool = True
+    order: int = 0
+    encryptedApiKey: str | None = None
+    apiKeyMasked: str | None = None
+    baseUrl: str | None = None
+    model: str | None = None
+
+
+class ProviderSettings(BaseModel):
+    providers: list[ProviderSetting] = Field(default_factory=list)
+    demoOnlyAccepted: bool = False
+    updatedAt: datetime | None = None
 
 
 # completed subtopic indices per node id, same shape the frontend keeps in localStorage

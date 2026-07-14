@@ -1,6 +1,3 @@
-"use client";
-
-import { motion, useReducedMotion } from "framer-motion";
 import { Database, Globe, Network, Zap, Boxes, type LucideIcon } from "lucide-react";
 
 interface PreviewNode {
@@ -9,15 +6,14 @@ interface PreviewNode {
   level: string;
   levelClass: string;
   position: string;
-  delay: number;
 }
 
 const NODES: PreviewNode[] = [
-  { icon: Network, label: "Computer Networks", level: "Beginner", levelClass: "text-primary-glow", position: "left-[6%] top-[2%]", delay: 0 },
-  { icon: Database, label: "Databases", level: "Beginner", levelClass: "text-primary-glow", position: "right-[8%] top-[18%]", delay: 0.8 },
-  { icon: Zap, label: "Caching", level: "Intermediate", levelClass: "text-secondary-glow", position: "left-[12%] top-[40%]", delay: 1.6 },
-  { icon: Globe, label: "Distributed Systems", level: "Advanced", levelClass: "text-success", position: "right-[4%] top-[58%]", delay: 0.4 },
-  { icon: Boxes, label: "Microservices", level: "Advanced", levelClass: "text-success", position: "left-[18%] top-[78%]", delay: 1.2 },
+  { icon: Network, label: "Computer Networks", level: "Beginner", levelClass: "text-primary-glow", position: "left-[6%] top-[2%]" },
+  { icon: Database, label: "Databases", level: "Beginner", levelClass: "text-primary-glow", position: "right-[8%] top-[18%]" },
+  { icon: Zap, label: "Caching", level: "Intermediate", levelClass: "text-secondary-glow", position: "left-[12%] top-[40%]" },
+  { icon: Globe, label: "Distributed Systems", level: "Advanced", levelClass: "text-success", position: "right-[4%] top-[58%]" },
+  { icon: Boxes, label: "Microservices", level: "Advanced", levelClass: "text-success", position: "left-[18%] top-[78%]" },
 ];
 
 const LINES = [
@@ -28,8 +24,6 @@ const LINES = [
 ] as const;
 
 export function FloatingPreview() {
-  const reduced = useReducedMotion();
-
   return (
     <div aria-hidden className="relative hidden h-[440px] select-none lg:block">
       <div className="absolute inset-0 rounded-2xl border border-line bg-card/40" />
@@ -45,11 +39,9 @@ export function FloatingPreview() {
         ))}
       </svg>
       {NODES.map((n) => (
-        <motion.div
+        <div
           key={n.label}
           className={`absolute ${n.position} flex items-center gap-2.5 rounded-xl border border-line bg-card px-3.5 py-2.5 shadow-card`}
-          animate={reduced ? undefined : { y: [0, -9, 0] }}
-          transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut", delay: n.delay }}
         >
           <span className="flex h-7 w-7 items-center justify-center rounded-md border border-line bg-elevated text-primary-glow">
             <n.icon size={13} strokeWidth={1.75} />
@@ -58,7 +50,7 @@ export function FloatingPreview() {
             <span className="block text-xs font-medium text-zinc-100">{n.label}</span>
             <span className={`block text-[10px] ${n.levelClass}`}>{n.level}</span>
           </span>
-        </motion.div>
+        </div>
       ))}
       <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-primary/15 blur-3xl" />
       <div className="absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-secondary/15 blur-3xl" />

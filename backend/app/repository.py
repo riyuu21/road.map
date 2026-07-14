@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from .models import Roadmap, StoredRoadmap, StoredUser, TopicProgress
+from .models import ProviderSettings, Roadmap, StoredRoadmap, StoredUser, TopicProgress
 
 
 class InMemoryRepository:
@@ -14,6 +14,7 @@ class InMemoryRepository:
     def __init__(self) -> None:
         self._store: dict[str, StoredRoadmap] = {}
         self._users: dict[str, StoredUser] = {}  # keyed by email
+        self._provider_settings: dict[str, ProviderSettings] = {}
         self._progress: dict[tuple[str, str], TopicProgress] = {}  # (user id, topic)
 
     async def save(self, roadmap: Roadmap) -> None:
@@ -36,6 +37,19 @@ class InMemoryRepository:
         self._users[email] = user
         return user
 
+    async def create_or_update_google_user(self, email: str, google_sub: str) -> StoredUser:
+        existing = self._users.get(email)
+        if existing:
+            existing.googleSub = existing.googleSub or google_sub
+            self._users[email] = existing
+            return existing
+        user = StoredUser(
+            id=uuid4().hex, email=email, googleSub=google_sub,
+            createdAt=datetime.now(timezone.utc),
+        )
+        self._users[email] = user
+        return user
+
     async def find_user_by_email(self, email: str) -> StoredUser | None:
         return self._users.get(email)
 
@@ -48,6 +62,13 @@ class InMemoryRepository:
     async def save_progress(self, user_id: str, topic: str, progress: TopicProgress) -> None:
         self._progress[(user_id, topic.lower())] = progress
 
+    async def get_provider_settings(self, user_id: str) -> ProviderSettings:
+        return self._provider_settings.get(user_id, ProviderSettings())
+
+    async def save_provider_settings(self, user_id: str, settings: ProviderSettings) -> None:
+        settings.updatedAt = datetime.now(timezone.utc)
+        self._provider_settings[user_id] = settings
+
 
 class MongoRepository:
     def __init__(self, uri: str, db: str) -> None:
@@ -55,6 +76,7 @@ class MongoRepository:
         # same collection/shape the Next.js backend wrote: {topic, nodes, edges, createdAt}
         self._col = client[db]["roadmaps"]
         self._users = client[db]["users"]
+        self._provider_settings = client[db]["provider_settings"]
         self._progress = client[db]["progress"]
 
     async def save(self, roadmap: Roadmap) -> None:
@@ -83,6 +105,20 @@ class MongoRepository:
         )
         return user if result.upserted_id else None
 
+    async def create_or_update_google_user(self, email: str, google_sub: str) -> StoredUser:
+        existing = await self.find_user_by_email(email)
+        if existing:
+            if not existing.googleSub:
+                await self._users.update_one({"id": existing.id}, {"$set": {"googleSub": google_sub}})
+                existing.googleSub = google_sub
+            return existing
+        user = StoredUser(
+            id=uuid4().hex, email=email, googleSub=google_sub,
+            createdAt=datetime.now(timezone.utc),
+        )
+        await self._users.insert_one(user.model_dump())
+        return user
+
     async def find_user_by_email(self, email: str) -> StoredUser | None:
         doc = await self._users.find_one({"email": email})
         return StoredUser(**{k: v for k, v in doc.items() if k != "_id"}) if doc else None
@@ -99,6 +135,18 @@ class MongoRepository:
         await self._progress.update_one(
             {"userId": user_id, "topic": topic.lower()},
             {"$set": {"nodes": progress, "updatedAt": datetime.now(timezone.utc)}},
+            upsert=True,
+        )
+
+    async def get_provider_settings(self, user_id: str) -> ProviderSettings:
+        doc = await self._provider_settings.find_one({"userId": user_id})
+        return ProviderSettings(**{k: v for k, v in doc.items() if k not in {"_id", "userId"}}) if doc else ProviderSettings()
+
+    async def save_provider_settings(self, user_id: str, settings: ProviderSettings) -> None:
+        settings.updatedAt = datetime.now(timezone.utc)
+        await self._provider_settings.update_one(
+            {"userId": user_id},
+            {"$set": {**settings.model_dump(), "userId": user_id}},
             upsert=True,
         )
 

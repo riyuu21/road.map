@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useEffect, useRef, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DEMO_ROADMAP } from "@/lib/demo-content";
@@ -13,6 +14,27 @@ const RoadmapCanvas = dynamic(
 );
 
 export function DemoPreview() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
+
+  // Defer the heavy React Flow graph until the section is near the viewport,
+  // so its bundle, dagre layout and edge animation don't run on first paint.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setInView(true);
+          obs.disconnect();
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+
   return (
     <section id="demo" className="scroll-mt-20">
       <div className="mx-auto max-w-6xl px-6 py-24">
@@ -34,8 +56,15 @@ export function DemoPreview() {
           </div>
         </FadeIn>
         <FadeIn delay={0.1}>
-          <div className="mt-10 h-[480px] overflow-hidden rounded-2xl border border-line bg-card/40 shadow-card">
-            <RoadmapCanvas roadmap={DEMO_ROADMAP} demo />
+          <div
+            ref={ref}
+            className="mt-10 h-[480px] overflow-hidden rounded-2xl border border-line bg-card/40 shadow-card"
+          >
+            {inView ? (
+              <RoadmapCanvas roadmap={DEMO_ROADMAP} demo />
+            ) : (
+              <Skeleton className="h-full w-full" />
+            )}
           </div>
         </FadeIn>
       </div>
